@@ -82,7 +82,7 @@ let render = (item,node) =>
 		let render = async () => {
 			let vdom = await make(item);
 			let next = patch(latest,vdom,node);
-			if(typeof latest === "undefined") r(next);
+			if(!latest) r(next);
 			latest = next;
 		}
 
@@ -98,11 +98,11 @@ let render = (item,node) =>
 let state = init => {
 	let tmp = CURR;
 	let key = tmp.count++;
-	let potentialVal = tmp.state[key];
+	let val = tmp.state[key];
 	return [
-		typeof potentialVal === "undefined"
+		val === void 0
 			? init.call ? init() : init
-			: potentialVal,
+			: val,
 		next => STATES[tmp.path].state[key] = next,UPDATE()
 	];
 };
