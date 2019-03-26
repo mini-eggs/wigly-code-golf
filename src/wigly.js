@@ -36,7 +36,7 @@ let make = async component => {
         for(let key in state.effects) {
             let {func,deps,lastDeps,cb} = state.effects[key];
             state.effects[key].lastDeps = deps;
-            if(typeof lastDeps === "undefined" || diff(deps,lastDeps)) {
+	    if(lastDeps === void 0 || diff(deps,lastDeps)) {
                 if(cb && cb.call) cb(state.el)
 		if(!skip) state.effects[key].cb = func(state.el);
             }
