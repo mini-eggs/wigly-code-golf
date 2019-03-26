@@ -11,26 +11,25 @@ let diff = (a,b) => {
     for(let e = 0; e < a.length; e++) if(a[e] !== b[e]) return true;
 }
 
-let h = (spec,props,...children) => ({spec,props,children:[].concat.apply([],children)})
+let h = (a,b,...c) => ({a,b,c:[].concat.apply([],c)})
 
 let make = async component => {
+    // leaf
     if(typeof component === "number" || typeof component === "string") {
         return component
     }
 
-    if(typeof component.spec !== "function") {
-        return vdom(
-            component.spec,
-            component.props,
-	    await Promise.all(component.children.map(make))
-        )
+    // basic
+    if(!component.a.call) {
+	return vdom(component.a,component.b,await Promise.all(component.c.map(make)));
     }
 
-    let key = (component.props||{}).key||0;
-    let path = `${CURR_PATH}${component.spec.name}${key}`
+    // state book keeping
+    let key = (component.b||{}).key||0;
+    let path = `${CURR_PATH}${component.a.name}${key}`
     let base = {effects:[],state:[],path};
     let potential = STATES[path]||{};
-    let state = {...base,...potential,effectsCount:0,stateCount:0}; 
+    let state = {...base,...potential,count:0,count:0}; 
     STATES[path] = CURR = state;
 
     let run = skip => {
@@ -47,35 +46,34 @@ let make = async component => {
     let tmp = CURR_PATH;
     CURR_PATH = path;
     
-    let item = component.spec({...component.props,children: component.children});
-    if(item.then) item = (await item).default({...component.props,children: component.children}); // async support
+    // call user function
+    let p = {...component.b,children:component.c};
+    let item = component.a(p);
+    if(item.then) item = (await item).default(p); // async support
 
     CURR_PATH = tmp;
 
     // fix props
-    item.props = item.props||{};
-    if(!item.props.key) item.props.key = 0;
+    item.b = item.b||{};
+    if(!item.b.key) item.b.key = 0;
 
-    item.props.oncreate = el => {
+    // superfine lifecycles
+    // this is where we care about calling
+    // effects
+    item.b.oncreate = el => {
 	    state.el = el;
 	    setTimeout(run);
     };
-
-    item.props.onupdate = el => {
+    item.b.onupdate = el => {
 	    state.el = el;
 	    setTimeout(run);
     };
-
-    item.props.ondestroy = el => {
+    item.b.ondestroy = el => {
 	    delete STATES[path];
 	    setTimeout(run, void 0, true);
     };
 
-    return vdom(
-        item.spec,
-        item.props,
-        await Promise.all(item.children.map(make))
-    )
+    return vdom(item.a,item.b,await Promise.all(item.c.map(make)))
 }
 
 let render = (item,node) =>
@@ -99,11 +97,11 @@ let render = (item,node) =>
 
 let state = init => {
 	let tmp = CURR;
-	let key = tmp.stateCount++;
+	let key = tmp.count++;
 	let potentialVal = tmp.state[key];
 	return [
 		typeof potentialVal === "undefined"
-			? typeof init === "function" ? init() : init
+			? init.call ? init() : init
 			: potentialVal,
 		next => STATES[tmp.path].state[key] = next,UPDATE()
 	];
@@ -111,7 +109,7 @@ let state = init => {
 
 let effect = (func,deps) => {
 	if(deps && !Array.isArray(deps)) deps = [deps]
-	let key = CURR.effectsCount++;
+	let key = CURR.count++;
 	CURR.effects[key] = {...(CURR.effects[key]||{}),func,deps}
 };
 
